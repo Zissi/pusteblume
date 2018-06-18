@@ -2,22 +2,28 @@ import pyb
 import lcd160cr
 import machine
 
+# create LCD on the X pins
 lcd = lcd160cr.LCD160CR('X')
+lcd.set_pen(lcd.rgb(255, 0, 0), lcd.rgb(64, 64, 128))
+
+# Erase lcd display when button is pressed
 sw = pyb.Switch()
 sw.callback(lambda: lcd.erase())
 
+# create I2C peripheral at frequency of 400kHz
 i2c = machine.I2C(sda=machine.Pin('Y10'), scl=machine.Pin('Y9'), freq=400000)
 i2c.scan()
 
-dt = 20
+# create empty arrays to store current observations and images
 b1 = bytearray(1)
 b2 = bytearray(2)
+image_buf = bytearray(10000)
 
 
 def hdc1080_read(a=0):
     b1[0] = a
     i2c.writeto(64, b1)
-    pyb.delay(dt)
+    pyb.delay(20)
     i2c.readfrom_into(64, b2)
     return (b2[0] << 8) | b2[1]
 
@@ -34,16 +40,15 @@ def hdc_hum():
     return (t / 0x10000) * 100
 
 
-def display_pusteblume(hum, average_hum_diff, tmp):
-    buf = bytearray(10000)
+def display_pusteblume(hum, average_hum_diff, tmp, last_image):
     with open('/sd/pusteblume/s_p_{}.jpg'.format(last_image), 'rb') as f:
-        f.readinto(buf)
+        f.readinto(image_buf)
         lcd.set_pos(0, 0)
-        lcd.jpeg(buf)
+        lcd.jpeg(image_buf)
         lcd.set_pos(5, 110)
         lcd.set_font(1, scale=1)
         lcd.set_text_color(lcd.rgb(188, 234, 231), lcd.rgb(64, 64, 128))
-        lcd.write('H ' + str(round(hum)))
+        lcd.write('H ' + str(round(hum)) + ' ')
         lcd.set_pos(40, 130)
         lcd.write(str(round(average_hum_diff, 2)))
 
@@ -63,7 +68,7 @@ def calculate_average_diff(observations):
 
 
 def read_sensors(last_temperatures, last_humidities, last_image):
-    lcd.set_pen(lcd.rgb(255, 0, 0), lcd.rgb(64, 64, 128))
+
     temp = hdc_temp()
     hum = hdc_hum()
 
@@ -78,13 +83,13 @@ def read_sensors(last_temperatures, last_humidities, last_image):
         average_hum_diff = calculate_average_diff(last_humidities)
 
         if average_hum_diff < 0:
-            display_pusteblume(hum, average_hum_diff, temp)
+            display_pusteblume(hum, average_hum_diff, temp, last_image)
 
             if last_image != 28:
                 last_image += 1
 
         elif average_hum_diff > 0.005 or hum > 90:
-            display_pusteblume(hum, average_hum_diff, temp)
+            display_pusteblume(hum, average_hum_diff, temp, last_image)
 
             if last_image != 1:
                 last_image -= 1
@@ -92,9 +97,11 @@ def read_sensors(last_temperatures, last_humidities, last_image):
     return last_temperatures, last_humidities, last_image
 
 
-last_temperatures = [0]
-last_humidities = [0]
-last_image = 2
+if __name__ == '__main__':
 
-while True:
-    last_temperatures, last_humidities, last_image = read_sensors(last_temperatures, last_humidities, last_image)
+    last_temps = [0]
+    last_hums = [0]
+    last_image = 2
+
+    while True:
+        last_temps, last_hums, last_image = read_sensors(last_temps, last_hums, last_image)
