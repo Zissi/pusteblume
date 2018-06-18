@@ -41,6 +41,9 @@ def hdc_hum():
 
 
 def display_pusteblume(hum, average_hum_diff, tmp, last_image):
+    # turn off all interrupts. Switch interrupt (line 10) erases the display and crashes
+    # if sth. writes to it at the same time.
+    irq_state = pyb.disable_irq()
     with open('/sd/pusteblume/s_p_{}.jpg'.format(last_image), 'rb') as f:
         f.readinto(image_buf)
         lcd.set_pos(0, 0)
@@ -56,6 +59,7 @@ def display_pusteblume(hum, average_hum_diff, tmp, last_image):
         lcd.set_font(1, scale=1)
         lcd.set_text_color(lcd.rgb(188, 234, 231), lcd.rgb(64, 64, 128))
         lcd.write('T ' + str(round(tmp)))
+    pyb.enable_irq(irq_state)
 
 
 def calculate_average_diff(observations):
@@ -68,7 +72,6 @@ def calculate_average_diff(observations):
 
 
 def read_sensors(last_temperatures, last_humidities, last_image):
-
     temp = hdc_temp()
     hum = hdc_hum()
 
@@ -84,13 +87,11 @@ def read_sensors(last_temperatures, last_humidities, last_image):
 
         if average_hum_diff < 0:
             display_pusteblume(hum, average_hum_diff, temp, last_image)
-
             if last_image != 28:
                 last_image += 1
 
         elif average_hum_diff > 0.005 or hum > 90:
             display_pusteblume(hum, average_hum_diff, temp, last_image)
-
             if last_image != 1:
                 last_image -= 1
 
