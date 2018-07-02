@@ -102,7 +102,7 @@ if __name__ == '__main__':
 
     last_temps = [0]
     last_hums = [0]
-    last_image = 2
+    last_image = 1
 
     while True:
         last_temps, last_hums, last_image = read_sensors(last_temps, last_hums, last_image)
