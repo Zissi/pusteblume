@@ -44,30 +44,32 @@ def display_pusteblume(hum, average_hum_diff, tmp, last_image):
     # turn off all interrupts. Switch interrupt (line 10) erases the display and crashes
     # if sth. writes to it at the same time.
     irq_state = pyb.disable_irq()
-    with open('/sd/pusteblume/s_p_{}.jpg'.format(last_image), 'rb') as f:
-        f.readinto(image_buf)
-        lcd.set_pos(0, 0)
-        lcd.jpeg(image_buf)
-        lcd.set_pos(5, 110)
-        lcd.set_font(1, scale=1)
-        lcd.set_text_color(lcd.rgb(188, 234, 231), lcd.rgb(64, 64, 128))
-        lcd.write('H ' + str(round(hum)) + ' ')
-        lcd.set_pos(40, 130)
-        lcd.write(str(round(average_hum_diff, 2)))
+    try:
+        with open('/sd/pusteblume/s_p_{}.jpg'.format(last_image), 'rb') as f:
+            f.readinto(image_buf)
+            lcd.set_pos(0, 0)
+            lcd.jpeg(image_buf)
+            lcd.set_pos(5, 110)
+            lcd.set_font(1, scale=1)
+            lcd.set_text_color(lcd.rgb(188, 234, 231), lcd.rgb(64, 64, 128))
+            lcd.write('H ' + str(round(hum)) + ' ')
+            lcd.set_pos(40, 130)
+            lcd.write(str(round(average_hum_diff, 2)))
 
-        lcd.set_pos(80, 110)
-        lcd.set_font(1, scale=1)
-        lcd.set_text_color(lcd.rgb(188, 234, 231), lcd.rgb(64, 64, 128))
-        lcd.write('T ' + str(round(tmp)))
-    pyb.enable_irq(irq_state)
+            lcd.set_pos(80, 110)
+            lcd.set_font(1, scale=1)
+            lcd.set_text_color(lcd.rgb(188, 234, 231), lcd.rgb(64, 64, 128))
+            lcd.write('T ' + str(round(tmp)))
+    finally:
+        pyb.enable_irq(irq_state)
 
 
 def calculate_average_diff(observations):
     diffs = []
-    for i, obs in enumerate(observations):
-        if i < len(observations) - 1:
-            diffs.append((observations[i + 1] - obs) / (obs + 1))
-
+    i = 0
+    while i < len(observations) - 1:
+        diffs.append(observations[i + 1] - observations[i])
+        i += 1
     return sum(diffs) / len(diffs)
 
 
@@ -75,7 +77,7 @@ def read_sensors(last_temperatures, last_humidities, last_image):
     temp = hdc_temp()
     hum = hdc_hum()
 
-    if abs(last_humidities[-1] - hum) > 0.5 or abs(last_temperatures[-1] - temp) > 0.5:
+    if abs(last_humidities[-1] - hum) > 0.1 or abs(last_temperatures[-1] - temp) > 0.5:
         last_humidities.append(hum)
         last_temperatures.append(temp)
 
@@ -87,13 +89,11 @@ def read_sensors(last_temperatures, last_humidities, last_image):
 
         if average_hum_diff < 0:
             display_pusteblume(hum, average_hum_diff, temp, last_image)
-            if last_image != 28:
-                last_image += 1
+            last_image = min(last_image + 1, 28)
 
-        elif average_hum_diff > 0.005 or hum > 90:
+        elif average_hum_diff > 0.2 or hum > 95:
             display_pusteblume(hum, average_hum_diff, temp, last_image)
-            if last_image != 1:
-                last_image -= 1
+            last_image = max(last_image - 1, 1)
 
     return last_temperatures, last_humidities, last_image
 
